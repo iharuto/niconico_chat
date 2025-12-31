@@ -1,0 +1,7 @@
+.claude
+CLAUDE.md
+.DS_Store
+.cache
+/node_modules
+package-lock.json
+chat_logs

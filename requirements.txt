@@ -1,0 +1,5 @@
+pyobjc-core==11.1
+pyobjc-framework-Cocoa==11.1
+
+# WebSocket client for chat display
+websocket-client==1.7.0

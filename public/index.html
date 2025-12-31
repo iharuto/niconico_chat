@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LAN Chat</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    #log { border: 1px solid #ccc; padding: 10px; height: 320px; overflow: auto; white-space: pre-wrap; }
+    .row { margin: 8px 0; display: flex; gap: 8px; }
+    input { padding: 6px; }
+    button { padding: 6px 10px; }
+    #chatBox { display:none; }
+  </style>
+</head>
+<body>
+  <h1>LAN Chat</h1>
+
+  <div id="authBox">
+    <div class="row">
+      <input id="nickname" placeholder="Nickname" maxlength="24" />
+      <input id="code" placeholder="Room code" />
+      <button id="join">Join</button>
+    </div>
+    <div id="authMsg"></div>
+  </div>
+
+  <div id="chatBox">
+    <div id="log"></div>
+    <div class="row">
+      <input id="text" placeholder="Message" style="flex:1" maxlength="500" />
+      <button id="send">Send</button>
+    </div>
+  </div>
+
+<script>
+  let ws;
+
+  const log = (line) => {
+    const el = document.getElementById("log");
+    el.textContent += line + "\n";
+    el.scrollTop = el.scrollHeight;
+  };
+
+  const connect = () => {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}`);
+
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "ok") {
+        document.getElementById("authBox").style.display = "none";
+        document.getElementById("chatBox").style.display = "block";
+        log(`[system] joined - you are ${msg.user_id}`);
+      } else if (msg.type === "error") {
+        document.getElementById("authMsg").textContent = msg.message;
+      } else if (msg.type === "system") {
+        log(`[system] ${msg.message}`);
+      } else if (msg.type === "chat") {
+        const t = new Date(msg.ts).toLocaleTimeString();
+        log(`[${t}] ${msg.user_id}: ${msg.text}`);
+      }
+    };
+
+    ws.onclose = () => log("[system] disconnected");
+  };
+
+  document.getElementById("join").onclick = () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) connect();
+
+    const nickname = document.getElementById("nickname").value || "anon";
+    const code = document.getElementById("code").value || "";
+
+    // 接続が開くのを待って auth
+    const sendAuth = () => ws.send(JSON.stringify({ type: "auth", nickname, code }));
+
+    if (ws.readyState === WebSocket.OPEN) sendAuth();
+    else ws.addEventListener("open", sendAuth, { once: true });
+  };
+
+  const sendChat = () => {
+    const text = document.getElementById("text").value;
+    document.getElementById("text").value = "";
+    if (!text.trim()) return;
+    ws.send(JSON.stringify({ type: "chat", text }));
+  };
+
+  document.getElementById("send").onclick = sendChat;
+  document.getElementById("text").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendChat();
+  });
+</script>
+</body>
+</html>
