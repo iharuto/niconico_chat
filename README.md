@@ -2,6 +2,10 @@
 
 A real-time LAN chat system with anonymous USER IDs, CSV logging, and niconico-style scrolling message display.
 
+## Demo
+
+<img src="demo.gif" alt="Demo" width="50%">
+
 ## Objective
 
 This system is designed to **encourage anonymous questions during live meetings and presentations**, especially for questions to hesitate to ask publicly.
@@ -20,12 +24,6 @@ This system is designed to **encourage anonymous questions during live meetings 
 
 **Example scenario:**
 During a biology presentation, a student types "What is mitochondria?" and it scrolls across the display. The presenter can address it without the student feeling embarrassed about asking a "basic" question.
-
-## Demo
-
-<img src="demo.gif" alt="Demo" width="50%">
-
-sorry for the gray color
 
 ---
 
