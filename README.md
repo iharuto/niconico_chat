@@ -93,13 +93,14 @@ Press Ctrl+C to stop (this will also stop server/client).
 - Auto-detects your WiFi IP address
 - Shows access URL for easy sharing
 
-# Or override with environment variable
+# Or override with environment variables
 ```bash
-MAX_CLIENTS=10 PORT=8080 ./main.sh
+MAX_CLIENTS=10 PORT=8080 MAX_CONNECTIONS_PER_IP=2 ./main.sh
 ```
 
-- `MAX_CLIENTS` tells the maximum accessible number of people 
-- `PORT` tells which port ID of host pc will be used
+- `MAX_CLIENTS` - Maximum number of participants allowed (default: 30)
+- `PORT` - Port number for server (default: 3000)
+- `MAX_CONNECTIONS_PER_IP` - Maximum connections per IP address (default: 1)
 
 
 ### chr_flow Display Settings (**optional**)
@@ -132,12 +133,50 @@ niconico_chat/
 ├── chat_logs/                      # CSV log files (auto-created)
 │   ├── 20251231_132229_log.csv
 │   └── 20251231_140530_log.csv
+├── .IP_tmp_logs/                   # IP tracking logs (temp, auto-deleted)
+│   ├── 20251231_132229_ip.log
+│   └── 20251231_140530_ip.log
 ├── chr_flow.py                     # Display engine (PyObjC)
 ├── chat_display_client.py          # CSV watcher + display
 ├── requirements.txt                # Python dependencies
 ├── package.json                    # Node.js dependencies
 └── README.md                       # This file
 ```
+
+### IP Tracking Logs (Temporary)
+
+**Purpose**: Rate limiting to prevent abuse (prevents one person from connecting multiple times).
+
+**Configuration**:
+- `MAX_CONNECTIONS_PER_IP` - Maximum connections allowed per IP address (default: 1)
+- Set via environment variable: `MAX_CONNECTIONS_PER_IP=2 ./main.sh`
+
+**Storage Details**:
+- **Location**: `.IP_tmp_logs/` directory
+- **Filename**: `YYYYMMDD_HHMMSS_ip.log` (same timestamp as corresponding chat log)
+- **Format**: `IP_ADDRESS,CONNECTION_COUNT` (one per line)
+- **Lifecycle**:
+  - Created automatically on server start
+  - Updated in real-time as users connect/disconnect
+  - **Deleted automatically** on server stop (Ctrl+C)
+
+**File content example** (`.IP_tmp_logs/20251231_132229_ip.log`):
+```
+192.168.1.100,1
+192.168.1.101,2
+192.168.1.102,1
+```
+
+**Timestamp correlation**:
+Both chat logs and IP logs use the same timestamp for easy correlation:
+```
+chat_logs/20251231_132229_log.csv     # Chat messages
+.IP_tmp_logs/20251231_132229_ip.log   # IP tracking (same timestamp!)
+```
+
+This allows the host to correlate chat activity with IP addresses if needed for moderation.
+
+**Note**: IP logs are temporary and automatically cleaned up. They are NOT committed to git (listed in `.gitignore`).
 
 ---
 
@@ -180,7 +219,7 @@ The person running the server (host) has access to:
 
 2. **All messages** - Both in real-time and permanently in logs
 
-3. **User IP addresses** - Visible in server logs and WebSocket connections
+3. **User IP addresses** - Available in WebSocket connection object (see below)
 
 4. **Complete conversation history** - CSV files are never deleted automatically
 
@@ -189,6 +228,46 @@ The person running the server (host) has access to:
 "13:23:08","Alice","USER_001","What is mitochondria?"
 ```
 The host can see that "Alice" asked this question, even though other participants only see "USER_001".
+
+### Can the Host See IP Addresses?
+
+**YES** - IP addresses ARE logged for rate limiting purposes.
+
+**Current implementation:**
+The system now tracks IP addresses to prevent abuse (one person connecting multiple times):
+
+**What's tracked** (server.js:155-157):
+```javascript
+wss.on("connection", (ws, req) => {
+  // Extract and store client IP
+  ws.clientIP = getClientIP(req);
+```
+
+**Where it's stored**:
+- **Temporary log files**: `.IP_tmp_logs/YYYYMMDD_HHMMSS_ip.log`
+- **Format**: `IP_ADDRESS,CONNECTION_COUNT` (one per line)
+- **Lifecycle**: Created on server start, **automatically deleted on server stop**
+
+**What this means:**
+- ✅ **IP tracking enabled**: Host can see IP addresses during session
+- ✅ **Temporary storage**: IP logs are deleted when server stops (Ctrl+C)
+- ✅ **Rate limiting**: Prevents spam by limiting connections per IP
+- ⚠️ **Host can correlate**: Host can link IP addresses to USER_### IDs and nicknames
+
+**Example correlation:**
+```csv
+# chat_logs/20251231_132229_log.csv
+"13:23:08","Alice","USER_001","What is mitochondria?"
+
+# .IP_tmp_logs/20251231_132229_ip.log
+192.168.1.100,1
+```
+The host can see that USER_001 (Alice) connected from IP 192.168.1.100.
+
+**How to verify IP logging:**
+- Check `server.js` lines 155-157 for `ws.clientIP = getClientIP(req)`
+- Check for `.IP_tmp_logs/` directory during server runtime
+- IP logs are visible while server runs, deleted on shutdown
 
 ### Trust Model
 
@@ -244,15 +323,16 @@ echo "MY_SECRET_CODE_2025" > ROOM_CODE.txt
 **For hosts:**
 1. **Use ROOM_CODE.txt** - Don't type room code in terminal where others can see
 2. **Keep CSV logs confidential** - Don't share them publicly
-3. **Delete logs after use** - Run `rm chat_logs/*.csv` when done
-4. **Inform participants** - Let them know you can see real nicknames
-5. **Secure your computer** - CSV logs contain private information
+3. **Delete logs after use** - Run `rm -rf chat_logs/ .IP_tmp_logs/` when done
+   - Note: IP logs are auto-deleted on server stop, but CSV logs are permanent
+4. **Inform participants** - Let them know you can see real nicknames and IP addresses
+5. **Secure your computer** - CSV logs and IP logs contain private information
 
 **For participants:**
-1. **Trust the host** - They will see your real nickname
+1. **Trust the host** - They will see your real nickname and IP address
 2. **Use appropriate nicknames** - Avoid using full real names if concerned
-3. **Use trusted networks only** - Avoid public WiFi
-4. **Know that anonymity is limited** - Host has full access to your identity
+3. **Use trusted networks only** - Avoid public WiFi (IP address is logged)
+4. **Know that anonymity is limited** - Host has full access to your identity and IP
 5. **Check for shoulder surfers** - Room code is still visible as `***` while typing
 
 ### Recommended Use Cases
@@ -277,10 +357,12 @@ echo "MY_SECRET_CODE_2025" > ROOM_CODE.txt
 
 ### Additional Security Notes
 
-- Server has no built-in rate limiting (assumes LAN trust)
+- **IP-based rate limiting enabled**: Limits connections per IP address (default: 1 per IP)
+- **IP logging active**: Temporary logs stored in `.IP_tmp_logs/` during session
 - No authentication beyond room code (simple shared password)
-- CSV files stored unencrypted on host's disk
-- No automatic log rotation or deletion
+- CSV files stored unencrypted on host's disk (permanent)
+- IP log files stored unencrypted on host's disk (temporary - auto-deleted)
+- No automatic CSV log rotation or deletion
 - Display client is read-only (cannot send messages)
 
 **Bottom line:** This is a **privacy-lite** system designed for trusted LAN environments like classrooms. It provides anonymity between participants but requires complete trust in the host.

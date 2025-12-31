@@ -8,6 +8,7 @@ fi
 ROOM_CODE="${ROOM_CODE:-BIO2025}"
 PORT="${PORT:-3000}"
 MAX_CLIENTS="${MAX_CLIENTS:-30}"
+MAX_CONNECTIONS_PER_IP="${MAX_CONNECTIONS_PER_IP:-1}"
 TMUX_SESSION="${TMUX_SESSION:-lan_chat}"
 
 get_lan_ip() {
@@ -37,6 +38,13 @@ cleanup() {
   echo ""
   echo "[main] stopping tmux session: ${TMUX_SESSION}"
   tmux kill-session -t "${TMUX_SESSION}" 2>/dev/null || true
+
+  # Clean up IP log directory
+  if [[ -d ".IP_tmp_logs" ]]; then
+    rm -rf ".IP_tmp_logs"
+    echo "[main] cleaned up .IP_tmp_logs/"
+  fi
+
   exit 0
 }
 
@@ -50,7 +58,7 @@ fi
 
 # Start server window
 tmux new-session -d -s "${TMUX_SESSION}" -n server \
-  "cd \"$(pwd)\" && ROOM_CODE=\"${ROOM_CODE}\" PORT=\"${PORT}\" MAX_CLIENTS=\"${MAX_CLIENTS}\" node server.js"
+  "cd \"$(pwd)\" && ROOM_CODE=\"${ROOM_CODE}\" PORT=\"${PORT}\" MAX_CLIENTS=\"${MAX_CLIENTS}\" MAX_CONNECTIONS_PER_IP=\"${MAX_CONNECTIONS_PER_IP}\" node server.js"
 
 # Start client window
 tmux new-window -t "${TMUX_SESSION}" -n client \
@@ -65,7 +73,7 @@ if [[ -z "${LAN_IP}" ]]; then
 fi
 
 echo "[main] server started in tmux session: ${TMUX_SESSION}"
-echo "[main] PORT=${PORT}  MAX_CLIENTS=${MAX_CLIENTS}"
+echo "[main] PORT=${PORT}  MAX_CLIENTS=${MAX_CLIENTS}  MAX_CONNECTIONS_PER_IP=${MAX_CONNECTIONS_PER_IP}"
 echo ""
 echo "Access URL:"
 echo "  http://${LAN_IP}:${PORT}"

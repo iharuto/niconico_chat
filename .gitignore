@@ -6,3 +6,4 @@ CLAUDE.md
 package-lock.json
 chat_logs
 .ROOM_CODE.txt
+.IP_tmp_logs

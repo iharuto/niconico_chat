@@ -7,6 +7,7 @@ const fs = require("fs");
 const ROOM_CODE = process.env.ROOM_CODE || "1234"; // 起動時に環境変数で上書き推奨
 const PORT = process.env.PORT || 3000;
 const MAX_CLIENTS = parseInt(process.env.MAX_CLIENTS || "30", 10);
+const MAX_CONNECTIONS_PER_IP = parseInt(process.env.MAX_CONNECTIONS_PER_IP || "1", 10);
 let userCounter = 0; // Auto-increment for USER_### assignment
 
 /**
@@ -44,6 +45,42 @@ function csvEscape(str) {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
+/**
+ * Extract client IP address from request object
+ * @param {http.IncomingMessage} req - HTTP request
+ * @returns {string} Client IP address
+ */
+function getClientIP(req) {
+  // Try x-forwarded-for header (for proxied connections)
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  // Direct connection
+  return req.socket.remoteAddress || 'unknown';
+}
+
+/**
+ * Write current IP connections to IP log file
+ * Format: IP,count (one per line)
+ */
+function updateIPLogFile() {
+  if (!ipLogFilePath) return; // Logging disabled
+
+  try {
+    const lines = [];
+    for (const [ip, count] of ipConnectionCount.entries()) {
+      if (count > 0) {
+        lines.push(`${ip},${count}`);
+      }
+    }
+    fs.writeFileSync(ipLogFilePath, lines.join('\n') + '\n', 'utf-8');
+  } catch (err) {
+    console.error('[IP Limit] Failed to update IP log:', err.message);
+  }
+}
+
 const app = express();
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -52,6 +89,12 @@ const wss = new WebSocket.Server({ server });
 
 /** 認証済みクライアントだけ入れる */
 const authedClients = new Set();
+
+// IP-based rate limiting
+// Map: IP address → count of authenticated connections
+const ipConnectionCount = new Map();
+const IP_LOG_DIR = path.join(__dirname, ".IP_tmp_logs");
+let ipLogFilePath = null; // Will be set during initialization
 
 // CSV Logging Setup
 const LOG_DIR = path.join(__dirname, "chat_logs");
@@ -69,6 +112,23 @@ try {
   console.error("Failed to initialize CSV log:", err.message);
   console.error("Chat will continue but messages will NOT be logged.");
   logFilePath = null;
+}
+
+// Initialize IP log directory and file (parallel to CSV logs)
+try {
+  // Create .IP_tmp_logs directory
+  fs.mkdirSync(IP_LOG_DIR, { recursive: true });
+
+  // Use the same timestamp as CSV log for correlation
+  const timestamp = formatNowForFilename();
+  ipLogFilePath = path.join(IP_LOG_DIR, `${timestamp}_ip.log`);
+
+  // Create empty log file
+  fs.writeFileSync(ipLogFilePath, '', 'utf-8');
+  console.log(`IP tracking initialized: ${ipLogFilePath} (max ${MAX_CONNECTIONS_PER_IP} per IP)`);
+} catch (err) {
+  console.error(`Failed to initialize IP log: ${err.message}`);
+  ipLogFilePath = null;
 }
 
 /**
@@ -93,6 +153,9 @@ function broadcast(obj) {
 }
 
 wss.on("connection", (ws, req) => {
+  // Extract and store client IP
+  ws.clientIP = getClientIP(req);
+
   ws.isAuthed = false;
   ws.nickname = "anon";
   ws.userId = null; // Will be assigned during auth
@@ -107,7 +170,19 @@ wss.on("connection", (ws, req) => {
 
     // ① 最初に auth を要求
     if (!ws.isAuthed) {
-      // Check room capacity first
+      // Check IP connection limit FIRST
+      const currentIPCount = ipConnectionCount.get(ws.clientIP) || 0;
+      if (currentIPCount >= MAX_CONNECTIONS_PER_IP) {
+        console.log(`[IP Limit] Rejected connection from ${ws.clientIP} (limit: ${MAX_CONNECTIONS_PER_IP})`);
+        ws.send(JSON.stringify({
+          type: "error",
+          message: `Connection limit reached. Max ${MAX_CONNECTIONS_PER_IP} connection(s) per device.`
+        }));
+        ws.close();
+        return;
+      }
+
+      // Check room capacity
       if (authedClients.size >= MAX_CLIENTS) {
         ws.send(JSON.stringify({ type: "error", message: "Room full" }));
         ws.close();
@@ -134,6 +209,11 @@ wss.on("connection", (ws, req) => {
       ws.isAuthed = true;
       ws.nickname = nickname;
       authedClients.add(ws);
+
+      // Increment IP connection count
+      ipConnectionCount.set(ws.clientIP, (ipConnectionCount.get(ws.clientIP) || 0) + 1);
+      updateIPLogFile();
+      console.log(`[IP Limit] ${ws.clientIP} authenticated (${ipConnectionCount.get(ws.clientIP)}/${MAX_CONNECTIONS_PER_IP})`);
 
       ws.send(JSON.stringify({ type: "ok", message: "authed", user_id: ws.userId }));
       broadcast({ type: "system", message: `${ws.userId} joined` });
@@ -164,6 +244,20 @@ wss.on("connection", (ws, req) => {
   ws.on("close", () => {
     if (authedClients.has(ws)) {
       authedClients.delete(ws);
+
+      // Decrement IP connection count
+      const currentCount = ipConnectionCount.get(ws.clientIP) || 0;
+      if (currentCount > 0) {
+        const newCount = currentCount - 1;
+        if (newCount === 0) {
+          ipConnectionCount.delete(ws.clientIP);
+        } else {
+          ipConnectionCount.set(ws.clientIP, newCount);
+        }
+        updateIPLogFile();
+        console.log(`[IP Limit] ${ws.clientIP} disconnected (${newCount}/${MAX_CONNECTIONS_PER_IP})`);
+      }
+
       broadcast({ type: "system", message: `${ws.userId} left` });
     }
   });
