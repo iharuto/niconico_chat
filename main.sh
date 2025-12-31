@@ -9,6 +9,7 @@ ROOM_CODE="${ROOM_CODE:-BIO2025}"
 PORT="${PORT:-3000}"
 MAX_CLIENTS="${MAX_CLIENTS:-30}"
 MAX_CONNECTIONS_PER_IP="${MAX_CONNECTIONS_PER_IP:-1}"
+AUTO_OPEN_BROWSER="${AUTO_OPEN_BROWSER:-true}"
 TMUX_SESSION="${TMUX_SESSION:-lan_chat}"
 
 get_lan_ip() {
@@ -78,6 +79,14 @@ echo ""
 echo "Access URL:"
 echo "  http://${LAN_IP}:${PORT}"
 echo ""
+
+# Auto-open Safari if enabled
+if [[ "${AUTO_OPEN_BROWSER}" == "true" ]] && [[ -n "${LAN_IP}" ]] && [[ "${LAN_IP}" != "(IP detection failed - use localhost)" ]]; then
+  if command -v open >/dev/null 2>&1; then
+    open -a Safari "http://${LAN_IP}:${PORT}" 2>/dev/null || echo "[main] Note: Could not open Safari automatically"
+  fi
+fi
+
 echo "Press Ctrl+C to stop (this will also stop server/client)."
 
 # Keep alive (Ctrl+C wait)

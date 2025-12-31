@@ -23,6 +23,10 @@ During a biology presentation, a student types "What is mitochondria?" and it sc
 
 ## Demo
 
+<img src="demo.gif" alt="Demo" width="50%">
+
+sorry for the gray color
+
 ---
 
 ## Quick Start
