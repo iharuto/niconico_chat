@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Read .ROOM_CODE from file if exists, otherwise use env var or default
+if [[ -z "${ROOM_CODE:-}" ]] && [[ -f ".ROOM_CODE.txt" ]]; then
+  ROOM_CODE="$(cat .ROOM_CODE.txt | tr -d '\n\r ')"
+fi
 ROOM_CODE="${ROOM_CODE:-BIO2025}"
 PORT="${PORT:-3000}"
 MAX_CLIENTS="${MAX_CLIENTS:-30}"
@@ -61,7 +65,7 @@ if [[ -z "${LAN_IP}" ]]; then
 fi
 
 echo "[main] server started in tmux session: ${TMUX_SESSION}"
-echo "[main] ROOM_CODE=${ROOM_CODE}  PORT=${PORT}  MAX_CLIENTS=${MAX_CLIENTS}"
+echo "[main] PORT=${PORT}  MAX_CLIENTS=${MAX_CLIENTS}"
 echo ""
 echo "Access URL:"
 echo "  http://${LAN_IP}:${PORT}"

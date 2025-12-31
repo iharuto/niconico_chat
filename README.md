@@ -1,13 +1,13 @@
-# NicoNico-Style LAN Chat with Scrolling Display
+# NicoNico-Style LAN Chat
 
 A real-time LAN chat system with anonymous USER IDs, CSV logging, and niconico-style scrolling message display.
 
 ## Objective
 
-This system is designed to **encourage anonymous questions during live meetings and presentations**, especially for questions that amateur or young students might hesitate to ask publicly.
+This system is designed to **encourage anonymous questions during live meetings and presentations**, especially for questions to hesitate to ask publicly.
 
 **Use cases:**
-- **"What is...?" questions** - Ask for definitions of technical terms without embarrassment
+- **"What is...?" questions** - Ask for definitions of technical terms to remind yourself
 - **Clarification requests** - "Can you repeat that?" or "What did you mean by...?"
 - **Basic questions** - Questions that might seem "too simple" to ask aloud
 - **Real-time feedback** - Quick questions during lectures without interrupting the speaker
@@ -21,26 +21,21 @@ This system is designed to **encourage anonymous questions during live meetings 
 **Example scenario:**
 During a biology presentation, a student types "What is mitochondria?" and it scrolls across the display. The presenter can address it without the student feeling embarrassed about asking a "basic" question.
 
-## Features
-
-- ✅ **Anonymous Chat** - Users get auto-assigned `USER_001`, `USER_002` IDs instead of showing nicknames
-- ✅ **Scrolling Display** - Messages flow across screen in real-time (niconico/danmaku style)
-- ✅ **CSV Logging** - All messages saved to timestamped CSV files
-- ✅ **Room Codes** - Password-protected chat rooms
-- ✅ **Capacity Limits** - Configurable max participants (default: 30)
-- ✅ **Multi-Lane Display** - Up to 5 messages scroll simultaneously
-- ✅ **No External Dependencies** - Display client uses only Python standard library
-- ✅ **Single Command Startup** - Just run `./main.sh` to start everything
+## Demo
 
 ---
 
 ## Quick Start
 
 ### 1. Setup (One-time)
+#### git clone
+```bash
+git clone https://github.com/iharuto/niconico_chat.git
+cd niconico_chat
+```
 
 #### Install Node.js Dependencies
 ```bash
-cd /Users/haruto/niconico_chat
 npm install
 ```
 
@@ -51,12 +46,22 @@ pip install -r requirements.txt
 
 #### Install tmux (if not already installed)
 ```bash
-# macOS
 brew install tmux
-
-# Ubuntu/Debian
-sudo apt install tmux
 ```
+
+#### Set Room Code (Recommended for Security)
+Create a `.ROOM_CODE.txt` file to keep your room code secret:
+
+```bash
+echo "YOUR_SECRET_CODE" > .ROOM_CODE.txt
+```
+
+This prevents the room code from:
+- Appearing in terminal output
+- Being saved in shell history
+- Being visible to anyone looking at your screen
+
+**Note:** `.ROOM_CODE.txt` is already in `.gitignore` and won't be committed to git.
 
 That's it! No additional packages needed.
 
@@ -69,197 +74,35 @@ That's it! No additional packages needed.
 The easiest way to start the chat system is using the `main.sh` script:
 
 ```bash
-cd /Users/haruto/niconico_chat
+cd niconico_chat
 ./main.sh
 ```
 
 You should see:
 ```
 [main] server started in tmux session: lan_chat
-[main] ROOM_CODE=BIO2025  PORT=3000  MAX_CLIENTS=30
+[main] PORT=3000  MAX_CLIENTS=30
 
 Access URL:
-  http://192.168.1.100:3000
+  http://YOUR.WIFI.IP.ADDRESS:3000
 
 Press Ctrl+C to stop (this will also stop server/client).
 ```
 
-**What it does:**
 - Starts server and display client automatically in background (tmux)
 - Auto-detects your WiFi IP address
 - Shows access URL for easy sharing
-- Ctrl+C stops everything cleanly
 
-**Custom configuration:**
+# Or override with environment variable
 ```bash
-# Custom room code and settings
-ROOM_CODE=PRIVATE2025 MAX_CLIENTS=10 PORT=8080 ./main.sh
-
-# View server/client logs anytime
-tmux attach -t lan_chat
-# Press Ctrl+B then D to detach
+MAX_CLIENTS=10 PORT=8080 ./main.sh
 ```
 
----
+- `MAX_CLIENTS` tells the maximum accessible number of people 
+- `PORT` tells which port ID of host pc will be used
 
-#### Alternative: Manual Two-Terminal Startup
 
-If you prefer to see live logs or don't have tmux:
-
-**Terminal 1: Start the Chat Server**
-```bash
-cd /Users/haruto/niconico_chat
-ROOM_CODE=BIO2025 node server.js
-```
-
-You should see:
-```
-CSV log initialized: /Users/haruto/niconico_chat/chat_logs/20251231_132229_log.csv
-LAN chat server running on port 3000
-ROOM_CODE = BIO2025
-Open: http://<server-lan-ip>:3000
-```
-
-**Terminal 2: Start the Display Client**
-```bash
-cd /Users/haruto/niconico_chat
-/usr/bin/python3 chat_display_client.py
-```
-
-You should see:
-```
-=== CSV Chat Display Client ===
-Log Directory: chat_logs
-Display: chr_flow.py (5 lanes)
-Format: Message text only
-
-Press ESC to exit
-
-[CSV Watcher] Watching: chat_logs/20251231_132229_log.csv
-Starting chr_flow display...
-```
-
----
-
-#### Join the Chat from Browser/Phone
-
-**On the same computer:**
-- Open: `http://localhost:3000`
-
-**On other devices (LAN):**
-1. Find server IP: `ifconfig | grep "inet " | grep -v 127.0.0.1`
-2. Open: `http://192.168.1.xxx:3000` (use your server's IP)
-
-**Join the chat:**
-1. Enter your nickname (e.g., "Alice")
-2. Enter room code: `BIO2025`
-3. Click "Join"
-4. Send messages → **watch them scroll on the display!**
-
----
-
-## How It Works
-
-```
-┌──────────────────────────────────────────────────────┐
-│  Web Clients (Browser/Phone)                         │
-│  - Enter nickname + room code                        │
-│  - Get assigned USER_001, USER_002, etc.            │
-│  - Send/receive messages                             │
-└──────────────────────────────────────────────────────┘
-                        ↓
-┌──────────────────────────────────────────────────────┐
-│  Node.js WebSocket Server (server.js)                │
-│  - Authenticates users with room code                │
-│  - Assigns USER_### IDs sequentially                 │
-│  - Broadcasts messages to all clients                │
-│  - Logs messages to CSV files                        │
-└──────────────────────────────────────────────────────┘
-                        ↓
-┌──────────────────────────────────────────────────────┐
-│  CSV Log Files (chat_logs/)                          │
-│  - Format: time,nickname,user_id,text                │
-│  - One file per server start                         │
-│  - Example: 20251231_132229_log.csv                  │
-└──────────────────────────────────────────────────────┘
-                        ↓
-┌──────────────────────────────────────────────────────┐
-│  Display Client (chat_display_client.py)             │
-│  - Watches CSV log for new messages                  │
-│  - Polls every 0.5 seconds                           │
-│  - Extracts message text only                        │
-│  - Feeds to chr_flow display                         │
-└──────────────────────────────────────────────────────┘
-                        ↓
-┌──────────────────────────────────────────────────────┐
-│  Scrolling Display (chr_flow.py)                     │
-│  - Transparent overlay on screen                     │
-│  - Up to 5 messages scroll simultaneously            │
-│  - Right-to-left animation (niconico style)          │
-│  - Works over other applications                     │
-└──────────────────────────────────────────────────────┘
-```
-
----
-
-## Configuration
-
-### Using main.sh (Recommended)
-
-The simplest way to configure the server:
-
-```bash
-# Basic usage with default settings
-./main.sh
-
-# Custom room code
-ROOM_CODE=SECRET2025 ./main.sh
-
-# Custom port
-PORT=8080 ROOM_CODE=SECRET2025 ./main.sh
-
-# All options
-ROOM_CODE=SECRET2025 PORT=8080 MAX_CLIENTS=50 ./main.sh
-
-# Example output:
-# [main] server started in tmux session: lan_chat
-# [main] ROOM_CODE=SECRET2025  PORT=8080  MAX_CLIENTS=50
-#
-# Access URL:
-#   http://192.168.1.100:8080
-#
-# Press Ctrl+C to stop (this will also stop server/client).
-```
-
-### Manual Server Configuration
-
-If using manual two-terminal startup:
-
-```bash
-# Room authentication code (required)
-ROOM_CODE=SECRET2025
-
-# Server port (default: 3000)
-PORT=8080
-
-# Maximum participants (default: 30)
-MAX_CLIENTS=50
-
-# Start server with config
-ROOM_CODE=SECRET2025 PORT=8080 MAX_CLIENTS=50 node server.js
-```
-
-### Display Client Options
-
-```bash
-# Default: watches chat_logs/ directory
-/usr/bin/python3 chat_display_client.py
-
-# Custom log directory
-/usr/bin/python3 chat_display_client.py --log-dir /path/to/logs
-```
-
-### chr_flow Display Settings
+### chr_flow Display Settings (**optional**)
 
 Edit `chr_flow.py` to customize the display:
 
@@ -278,84 +121,6 @@ ALPHA = 0.9            # Window transparency (0.0-1.0)
 
 ---
 
-## Features Explained
-
-### 1. Anonymous USER_### IDs
-
-**Purpose**: Hide real nicknames for privacy
-
-**How it works:**
-- Server assigns IDs sequentially: `USER_001`, `USER_002`, etc.
-- Web clients see only USER IDs (not nicknames)
-- Nicknames stored in CSV log for moderation
-- IDs never reused during server session
-
-**Example:**
-```
-[12:34:56] USER_001: Hello everyone!
-[12:35:02] USER_002: Hi there!
-[12:35:10] USER_001: How are you?
-```
-
-### 2. CSV Logging
-
-**Purpose**: Permanent record of all messages
-
-**Log Format:**
-```csv
-time,nickname,user_id,text
-"13:23:08","Alice","USER_001","Hello everyone!"
-"13:23:15","Bob","USER_002","Hi there!"
-```
-
-**Log Files:**
-- Location: `chat_logs/`
-- Filename: `YYYYMMDD_HHMMSS_log.csv`
-- One file per server start
-- Proper CSV escaping (handles quotes, commas, newlines)
-
-**To view logs:**
-```bash
-# View latest log
-cat chat_logs/*.csv | tail -20
-
-# Open in Excel/Numbers
-open chat_logs/20251231_132229_log.csv
-```
-
-### 3. Room Capacity Limits
-
-**Purpose**: Prevent overcrowding on personal servers
-
-**How it works:**
-- Set `MAX_CLIENTS` environment variable
-- Server rejects connections when room is full
-- Display client counts as one participant
-
-**Example:**
-```bash
-# Allow only 10 participants
-MAX_CLIENTS=10 ROOM_CODE=PRIVATE node server.js
-```
-
-### 4. Scrolling Display
-
-**Purpose**: Visual, distraction-free message display
-
-**Features:**
-- **Transparent overlay**: Works over other apps
-- **Click-through**: Mouse events pass through
-- **Multi-lane**: Up to 5 messages scroll at once
-- **Auto-queue**: New messages spawn as lanes free
-- **ESC to exit**: Press ESC key to close
-
-**Display format:**
-- Shows message text ONLY
-- No user IDs, no timestamps
-- Clean, minimal display
-
----
-
 ## File Structure
 
 ```
@@ -371,7 +136,6 @@ niconico_chat/
 ├── chat_display_client.py          # CSV watcher + display
 ├── requirements.txt                # Python dependencies
 ├── package.json                    # Node.js dependencies
-├── CLAUDE.md                       # Implementation requirements
 └── README.md                       # This file
 ```
 
@@ -379,204 +143,26 @@ niconico_chat/
 
 ## Troubleshooting
 
-### Issue: "tmux: command not found"
-
-**Cause**: tmux is not installed (required for `main.sh`)
-
-**Solution**: Install tmux
-```bash
-# macOS
-brew install tmux
-
-# Ubuntu/Debian
-sudo apt install tmux
-```
-
-**Alternative**: Use manual two-terminal startup instead.
-
-### Issue: "Address already in use" or "Port already in use"
-
-**Cause**: Server is already running from a previous session
-
-**Solution using main.sh**:
-```bash
-# main.sh automatically kills old sessions, just run it again
-./main.sh
-```
-
-**Manual solution**:
-```bash
-# Find and kill the process using the port
-lsof -ti:3000 | xargs kill
-
-# Or kill all node processes
-pkill -f "node server.js"
-
-# Check for orphaned tmux sessions
-tmux ls
-tmux kill-session -t lan_chat
-```
-
-### Issue: "ModuleNotFoundError: No module named 'websocket'"
-
-**Solution**: This error is obsolete! The new CSV-based display client doesn't need websocket-client. Just run:
-```bash
-/usr/bin/python3 chat_display_client.py
-```
-
-### Issue: Display client shows no messages
-
-**Checklist:**
-1. ✅ Server is running? Check Terminal 1
-2. ✅ Display client is running? Check Terminal 2
-3. ✅ CSV log file exists? Check `ls chat_logs/`
-4. ✅ Sent NEW message? (Old messages are skipped)
-
-**Debug:**
-```bash
-# Check if messages are in CSV
-cat chat_logs/*.csv | tail -5
-
-# Check display client output
-# Should show: "[CSV Watcher] Queued: your message..."
-```
-
-### Issue: "Room full" error
-
-**Cause**: Too many participants (default limit: 30)
-
-**Solutions:**
-```bash
-# Option 1: Increase limit
-MAX_CLIENTS=50 ROOM_CODE=BIO2025 node server.js
-
-# Option 2: Disconnect some users
-# Users must close browser tabs or disconnect
-```
-
-### Issue: Messages have 0.5 second delay
-
-**Cause**: Display client polls CSV every 0.5 seconds (by design)
-
-**This is normal!** CSV-based approach trades slight delay for simplicity.
-
-**To reduce delay**: Edit `chat_display_client.py`:
-```python
-POLL_INTERVAL = 0.2  # Faster polling (more CPU usage)
-```
-
 ### Issue: chr_flow display not visible
 
 **Checklist:**
-1. ✅ Screen recording permission granted?
+1. Screen recording permission granted?
    - System Preferences > Security & Privacy > Privacy > Screen Recording
    - Enable for Terminal or Python
-2. ✅ Display shows on correct screen? (Multi-monitor setups)
-3. ✅ Window transparency too high? Edit `chr_flow.py`:
+2. Display shows on correct screen? Or not full screen?
+3. Window transparency too high? Edit `chr_flow.py`:
    ```python
    ALPHA = 1.0  # Fully opaque (easier to see)
    ```
-
-### Issue: Can't connect from other devices
-
-**Cause**: Firewall blocking port 3000
-
-**Solutions:**
-```bash
-# Option 1: Allow port in firewall
-# System Preferences > Security & Privacy > Firewall > Firewall Options
-# Add node.js to allowed apps
-
-# Option 2: Temporarily disable firewall (testing only)
-# Not recommended for production use
-```
 
 **Find your server IP:**
 ```bash
 # macOS
 ifconfig | grep "inet " | grep -v 127.0.0.1
 
-# Example output: inet 192.168.1.100
-# Use: http://192.168.1.100:3000 from other devices
+# Example output: inet 123.456.7.890
+# Use: http://123.456.7.890:3000 from other devices
 ```
-
----
-
-## Advanced Usage
-
-### Viewing Live Logs
-
-When using `main.sh`, server and client run in background. To view live logs:
-
-```bash
-# Attach to tmux session
-tmux attach -t lan_chat
-
-# Navigate between windows
-Ctrl+B 0  # Server logs (window 0)
-Ctrl+B 1  # Display client logs (window 1)
-
-# Detach (leave running in background)
-Ctrl+B D
-
-# List all sessions
-tmux ls
-
-# Kill a specific session
-tmux kill-session -t lan_chat
-```
-
-### Multiple Display Screens
-
-Run multiple display clients for different screens:
-
-```bash
-# Using main.sh (starts one display)
-./main.sh
-
-# In another terminal, start additional display client
-/usr/bin/python3 chat_display_client.py
-
-# Or start manually on each screen
-/usr/bin/python3 chat_display_client.py  # Screen 1
-/usr/bin/python3 chat_display_client.py  # Screen 2
-```
-
-Both will show the same messages (synchronized via CSV).
-
-### Running in Background
-
-`main.sh` already runs server and client in background using tmux. If you need to run it detached from terminal:
-
-```bash
-# Start and immediately detach
-./main.sh &
-
-# Or use nohup to keep it running after logout
-nohup ./main.sh > main.log 2>&1 &
-
-# Check logs
-tail -f main.log
-
-# Stop
-pkill -f "main.sh"
-# Or attach and Ctrl+C:
-fg  # Bring to foreground, then Ctrl+C
-```
-
-### Replaying Old Messages
-
-Display client can replay old CSV logs:
-
-```bash
-# Copy old log to new name
-cp chat_logs/20251231_132229_log.csv chat_logs/replay.csv
-
-# Watch the replay file
-/usr/bin/python3 chat_display_client.py --log-dir chat_logs
-```
-
-Then append messages to `replay.csv` manually or with a script.
 
 ---
 
@@ -632,19 +218,42 @@ The host can see that "Alice" asked this question, even though other participant
   - Rate limiting and DDoS protection
   - Security auditing
 
+### Security Features
+
+This system includes several security features to protect room codes:
+
+1. **Password-masked input** - Room code field shows `***` instead of plain text when typing
+2. **Hidden terminal output** - `main.sh` displays `ROOM_CODE=*****` instead of actual code
+3. **ROOM_CODE.txt file** - Store room code in file (gitignored) instead of command line
+4. **No shell history** - Using file prevents code from appearing in bash history
+
+**Example of secure setup:**
+```bash
+# Create secret room code file (one time)
+echo "MY_SECRET_CODE_2025" > ROOM_CODE.txt
+
+# Start server (code won't appear in terminal or history)
+./main.sh
+
+# Output shows:
+# [main] ROOM_CODE=*****  PORT=3000  MAX_CLIENTS=30
+```
+
 ### Privacy Best Practices
 
 **For hosts:**
-1. **Keep CSV logs confidential** - Don't share them publicly
-2. **Delete logs after use** - Run `rm chat_logs/*.csv` when done
-3. **Inform participants** - Let them know you can see real nicknames
-4. **Secure your computer** - CSV logs contain private information
+1. **Use ROOM_CODE.txt** - Don't type room code in terminal where others can see
+2. **Keep CSV logs confidential** - Don't share them publicly
+3. **Delete logs after use** - Run `rm chat_logs/*.csv` when done
+4. **Inform participants** - Let them know you can see real nicknames
+5. **Secure your computer** - CSV logs contain private information
 
 **For participants:**
 1. **Trust the host** - They will see your real nickname
 2. **Use appropriate nicknames** - Avoid using full real names if concerned
 3. **Use trusted networks only** - Avoid public WiFi
 4. **Know that anonymity is limited** - Host has full access to your identity
+5. **Check for shoulder surfers** - Room code is still visible as `***` while typing
 
 ### Recommended Use Cases
 
@@ -755,52 +364,3 @@ This implementation is original and not affiliated with or endorsed by DWANGO or
 
 See LICENSE file for details.
 
----
-
-## Support
-
-**Issues?** Check the Troubleshooting section above.
-
-**Questions?** Review the configuration options and how-it-works diagram.
-
-**Want to contribute?** See CLAUDE.md for implementation details.
-
----
-
-## Quick Reference
-
-**Start everything (recommended):**
-```bash
-./main.sh
-# Custom config: ROOM_CODE=BIO2025 MAX_CLIENTS=10 PORT=8080 ./main.sh
-```
-
-**Stop everything:**
-- Press **Ctrl+C** (stops both server and display)
-
-**View logs:**
-```bash
-tmux attach -t lan_chat
-# Press Ctrl+B then 0 for server logs
-# Press Ctrl+B then 1 for client logs
-# Press Ctrl+B then D to detach
-```
-
-**Manual startup (alternative):**
-```bash
-# Terminal 1: Start server
-ROOM_CODE=BIO2025 node server.js
-
-# Terminal 2: Start display
-/usr/bin/python3 chat_display_client.py
-```
-
-**Join chat:**
-- Open: `http://localhost:3000` (local) or the URL shown by `main.sh` (LAN)
-- Enter nickname and room code
-- Send messages!
-
-**Exit display (manual mode only):**
-- Press **ESC** key
-
-That's all you need to know! 🎉
