@@ -164,9 +164,9 @@ niconico_chat/
 
 **File content example** (`.IP_tmp_logs/20251231_132229_ip.log`):
 ```
-192.168.1.100,1
-192.168.1.101,2
-192.168.1.102,1
+123.456.789.0,1
+123.456.789.1,2
+123.456.789.2,1
 ```
 
 **Timestamp correlation**:
@@ -262,9 +262,9 @@ wss.on("connection", (ws, req) => {
 "13:23:08","Alice","USER_001","What is mitochondria?"
 
 # .IP_tmp_logs/20251231_132229_ip.log
-192.168.1.100,1
+123.456.7890,1
 ```
-The host can see that USER_001 (Alice) connected from IP 192.168.1.100.
+The host can see that USER_001 (Alice) connected from IP 123.456.7890.
 
 **How to verify IP logging:**
 - Check `server.js` lines 155-157 for `ws.clientIP = getClientIP(req)`
